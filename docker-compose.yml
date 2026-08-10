@@ -1,0 +1,39 @@
+version: '3.8'
+
+services:
+  server:
+    build: .
+    container_name: serversentinel-api
+    command: uvicorn server.main:app --host 0.0.0.0 --port 8000
+    ports:
+      - "8000:8000"
+    volumes:
+      - ./data:/app/data
+    environment:
+      - DATABASE_URL=sqlite:////app/data/metrics.db
+    restart: unless-stopped
+
+  agent:
+    build: .
+    container_name: serversentinel-agent
+    command: python agent/agent.py
+    environment:
+      - API_URL=http://server:8000/metrics/
+      - SERVER_ID=docker-node-1
+      - INTERVAL=5
+    depends_on:
+      - server
+    restart: unless-stopped
+    # Need access to host system for accurate metrics, but for testing, container metrics are fine
+
+  dashboard:
+    build: .
+    container_name: serversentinel-dashboard
+    command: streamlit run dashboard/app.py --server.port 8501 --server.address 0.0.0.0
+    ports:
+      - "8501:8501"
+    environment:
+      - API_URL=http://server:8000
+    depends_on:
+      - server
+    restart: unless-stopped
